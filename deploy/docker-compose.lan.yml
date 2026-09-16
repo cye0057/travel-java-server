@@ -4,7 +4,11 @@
 #
 # 用法（在服务器的 deploy/ 目录）：
 #   cp .env.example .env   # 填 DB_PASSWORD / LLM_API_KEY / AMAP_KEY
+#   docker compose -f docker-compose.lan.yml config      # 改完先校验语法，再 up
 #   docker compose -f docker-compose.lan.yml up -d --build
+#
+# 变量写法只用最朴素的 ${VAR}，不要加冒号修饰：曾出现过被写坏成字面星号，
+# compose 报 "invalid interpolation format"，排查成本很高。所以上面那条 config 别省。
 #
 # 注意：backend 容器访问宿主机上的 Redis/Milvus 直连 VM 真实 IP 192.168.11.194。
 # 不要改成 host.docker.internal——host-gateway 解析到网桥 172.17.0.1，
@@ -16,7 +20,7 @@ services:
     image: mysql:8.0
     container_name: travel-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_P…创建}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: travel_db
       TZ: Asia/Shanghai
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
@@ -36,9 +40,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: mysql
-      DB_PASSWORD: ${DB_PASSWORD:*** DB_PASSWORD}
-      LLM_API_KEY: ${LLM_API_KEY:*** LLM_API_KEY}
-      AMAP_KEY: ${AMAP_KEY:*** AMAP_KEY}
+      DB_PASSWORD: ${DB_PASSWORD}
+      LLM_API_KEY: ${LLM_API_KEY}
+      AMAP_KEY: ${AMAP_KEY}
       # 复用宿主机 redis/milvus：直连 VM 真实 IP。
       # 不能写 host.docker.internal——host-gateway 解析到的是网桥 172.17.0.1，
       # 而这两个服务发布在 0.0.0.0 上，网桥地址没监听，表现为连接超时。
