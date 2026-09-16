@@ -18,6 +18,11 @@
 - **C Milvus RAG** ✅ 语料 `resources/knowledge/*.md`（5 城×4 小节，内埋 3 处虚构针头事实用于验证）；EmbeddingService(bge-m3 1024维批量)；KnowledgeService(按 `##` 切块+城市前缀+<30字过滤；全量重建；collection `travel_knowledge` COSINE+AUTOINDEX)；chat 每轮现查现用注入 system 提示词；关键参数 `rag.top-k=4`、`rag.min-score=0.6`
 - **D 部署上线 + GitHub + JMeter** ✅ **已完成**（2026-09-17 核对）。实际执行与 §2 原计划有偏差，均为更优做法：未建 `application-example.yml`，改为把 `application.yml` 全量环境变量化（`${ENV_VAR}` 占位符，入库零真实密钥）+ 新增 `application-dev-example.yml` 模板 + `.gitignore` 屏蔽 `application-dev.yml`；git 历史经 `-S` 全量扫描确认从未出现真实密钥；仓库 `cye0057/travel-java-server`（main 分支，非 master）已推送且本地=远端 `2a4980b`；JMeter 报告已提交 `docs/benchmark.md`；8080/8081 无残留进程
 - **E 简历项目描述** ✅ **已完成**（2026-09-17）。产出 `RESUME.md`：完整档 350 字简历正文 / 精简档 1~2 行 / STAR 面试版 7 个高频问题 / 已知边界 / 技术栈关键词
+- **VM 局域网部署实战** ✅ **已跑通**（2026-09-17，192.168.11.194）。过程中排掉 3 个坑，均已固化进 `deploy/DEPLOY.md` 与 compose：
+  1. `host-gateway` 解析到的是网桥 `172.17.0.1`，而宿主机 Redis/Milvus 发布在 `0.0.0.0` → 容器连 6379/19530 超时 → 注册 500（`登录服务暂不可用（Redis未启动）`，但 MySQL 写入成功、前两行日志显示 Hikari 正常）→ **改直连真实 IP**（REDIS_HOST/MILVUS_URI 不再用 host.docker.internal）
+  2. `docker compose up -d` 修改环境变量后**不会重建容器**（镜像没变时 0.0.0s 跳过），必须 `--force-recreate`
+  3. VM 上 `git pull` 撞本地改动 → `git stash` + `git stash pop`（用户手动去掉了 compose 里的变量默认值，保留）
+- 验活命令：`curl localhost:8080/api/user/register -d '{"username":"smoke1","password":"test1234"}'` 返回 token 即全链路通（含 Redis）
   - D 阶段的 E2E 真实浏览器测试已完成，抓到 5 个接口测试测不出的 bug 并全部修复：①fetchStream 原生 fetch 不走 axios 拦截器→手动补 Authorization ②前端读 `res.message` 后端是 `messages`→拦截器统一取值 ③`Result.fail(code,msg)` 漏回填 code（见 §3）④越权查询 `queryForObject` 无结果抛异常→改 `queryForList` 判空抛 UnauthorizedException（HistoryService.java:86-92）⑤模型幻觉工具名 get_poi→别名归一+清单回传自纠（TravelServiceImpl.java:367-383）
   - 已核对：uitester1 会话 4 条消息落库；登出后 token 即时失效
 - **E 简历项目描述** ⏳ 未开始
