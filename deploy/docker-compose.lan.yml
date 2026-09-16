@@ -38,11 +38,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:*** DB_PASSWORD}
       LLM_API_KEY: ${LLM_API_KEY:*** LLM_API_KEY}
       AMAP_KEY: ${AMAP_KEY:*** AMAP_KEY}
-      REDIS_HOST: host.docker.internal     # 复用宿主机 redis（19530/6379 都是它发布出来的）
-      MILVUS_URI: http://host.docker.internal:19530
+      # 复用宿主机 redis/milvus：直连 VM 真实 IP。
+      # 不能写 host.docker.internal——host-gateway 解析到的是网桥 172.17.0.1，
+      # 而这两个服务发布在 0.0.0.0 上，网桥地址没监听，表现为连接超时。
+      REDIS_HOST: 192.168.11.194
+      MILVUS_URI: http://192.168.11.194:19530
       TZ: Asia/Shanghai
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # Linux docker 也能解析宿主机
     depends_on:
       mysql:
         condition: service_healthy
