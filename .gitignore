@@ -46,3 +46,5 @@ jmeter/after/
 jmeter/final/
 .env
 *.local
+# AI 助手本地工作区（不进版本库）
+.zcode/
