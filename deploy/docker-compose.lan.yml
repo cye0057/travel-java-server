@@ -1,0 +1,63 @@
+# 局域网部署精简版：目标机 192.168.11.194（该机已有 travel-redis / milvus-standalone 容器）
+# 只新增 mysql + backend + web 三件套，复用现有 Redis 和 Milvus——
+# 好处：RAG 知识库 travel_knowledge 不重建、向量化的 embedding 费用不重复花。
+#
+# 用法（在服务器的 deploy/ 目录）：
+#   cp .env.example .env   # 填 DB_PASSWORD / LLM_API_KEY / AMAP_KEY
+#   docker compose -f docker-compose.lan.yml up -d --build
+#
+# 注意：backend 容器访问宿主机上的 Redis/Milvus 用 host.docker.internal，
+# Linux 上需 extra_hosts 映射（下面已配好）；若你的 docker 版本不支持则改为宿主机内网 IP。
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: travel-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_P…创建}
+      MYSQL_DATABASE: travel_db
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: travel-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: mysql
+      DB_PASSWORD: ${DB_PASSWORD:*** DB_PASSWORD}
+      LLM_API_KEY: ${LLM_API_KEY:*** LLM_API_KEY}
+      AMAP_KEY: ${AMAP_KEY:*** AMAP_KEY}
+      REDIS_HOST: host.docker.internal     # 复用宿主机 redis（19530/6379 都是它发布出来的）
+      MILVUS_URI: http://host.docker.internal:19530
+      TZ: Asia/Shanghai
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux docker 也能解析宿主机
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: ../../trval-h5
+      dockerfile: ../travel-java-server/deploy/Dockerfile.web
+    container_name: travel-web
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  mysql-data:
