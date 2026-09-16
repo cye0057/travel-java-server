@@ -6,8 +6,9 @@
 #   cp .env.example .env   # 填 DB_PASSWORD / LLM_API_KEY / AMAP_KEY
 #   docker compose -f docker-compose.lan.yml up -d --build
 #
-# 注意：backend 容器访问宿主机上的 Redis/Milvus 用 host.docker.internal，
-# Linux 上需 extra_hosts 映射（下面已配好）；若你的 docker 版本不支持则改为宿主机内网 IP。
+# 注意：backend 容器访问宿主机上的 Redis/Milvus 直连 VM 真实 IP 192.168.11.194。
+# 不要改成 host.docker.internal——host-gateway 解析到网桥 172.17.0.1，
+# 而这两个服务发布在 0.0.0.0 上，网桥地址无监听，表现为连接超时。
 
 services:
 
