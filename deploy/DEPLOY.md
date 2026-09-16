@@ -23,7 +23,7 @@ ss -tlnp | grep -E ':80 |:8080 '       # 80/8080 应空闲，被占则改 compos
 git clone https://github.com/cye0057/travel-java-server.git
 
 # 2) 前端仓库需与本仓库【同级目录】（compose 里 build context 是 ../../trval-h5）
-git clone <trval-h5仓库地址>
+git clone https://github.com/cye0057/trval-h5.git
 
 # 3) 密钥注入：compose 自动读同目录 .env
 cd travel-java-server/deploy
