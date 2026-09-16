@@ -1,0 +1,48 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### 本地机密与杂物（严禁入库） ###
+# 本地真实配置（入库模板是 application-dev-example.yml）
+application-dev.yml
+# 含密钥的本地调试脚本/临时产物
+test_llm.py
+prompt.txt
+content.json
+# 运行日志与压测产物
+jmeter.log
+jmeter/baseline/
+jmeter/after/
+jmeter/final/
+.env
+*.local

@@ -1,0 +1,110 @@
+# 一键起全栈：MySQL + Redis + Milvus + 后端 + 前端(nginx)。
+# 用法（在 deploy/ 目录）：
+#   1. cp .env.example .env 并填真实密钥
+#   2. docker compose up -d --build
+# 前端源码假定与本仓库同级（trval-h5/ 与 travel-java-server/ 并排 checkout）。
+# 个人服务器内存紧张时：只留 backend+web，把 redis/milvus 注释掉、
+# .env 里 REDIS_HOST/MILVUS_URI 指向你现有实例即可。
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: travel-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_P…创建}
+      MYSQL_DATABASE: travel_db
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8
+    container_name: travel-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
+  # Milvus standalone 三件套（版本与开发环境一致 v2.5.0）
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.14
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_ARG: "2"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_INITIAL_CLUSTER: etcd=http://etcd:2380
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+    volumes:
+      - etcd-data:/etcd
+    command: etcd --name=etcd --data-dir=/etcd
+      --initial-advertise-peer-urls=http://etcd:2380
+      --advertise-client-urls=http://etcd:2379 --listen-peer-urls=http://0.0.0.0:2380
+      --listen-client-urls=http://0.0.0.0:2379 --initial-cluster=etcd=http://etcd:2380
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: ***
+    command: minio server /minio_data --console-address ":9001"
+    volumes:
+      - minio-data:/minio_data
+
+  milvus:
+    image: milvusdb/milvus:v2.5.0
+    container_name: travel-milvus
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+
+  backend:
+    build:
+      context: ..                 # 后端仓库根目录
+      dockerfile: deploy/Dockerfile
+    container_name: travel-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod          # 容器里没有 application-dev.yml，强制走环境变量注入
+      DB_HOST: mysql
+      DB_PASSWORD: ${DB_PASSWORD:*** DB_PASSWORD}   # :? 语法=缺值直接拒绝启动，防止带病上线
+      LLM_API_KEY: ${LLM_API_KEY:*** LLM_API_KEY}
+      AMAP_KEY: ${AMAP_KEY:*** AMAP_KEY}
+      REDIS_HOST: redis
+      MILVUS_URI: http://milvus:19530
+      TZ: Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+      milvus:
+        condition: service_started
+    ports:
+      - "8080:8080"     # 压测直连后端用；纯内网部署可去掉
+
+  web:
+    build:
+      context: ../../trval-h5     # 前端仓库（与本仓库同级 checkout）
+      dockerfile: ../travel-java-server/deploy/Dockerfile.web
+    container_name: travel-web
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  mysql-data:
+  redis-data:
+  etcd-data:
+  minio-data:
+  milvus-data:

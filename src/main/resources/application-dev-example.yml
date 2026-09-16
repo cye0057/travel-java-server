@@ -1,0 +1,14 @@
+# ============================================================
+# 本地开发配置模板：复制本文件为 application-dev.yml 并填入真实值。
+# application-dev.yml 已在 .gitignore 中，不会进版本库。
+# 没有它应用启动会报 "Could not resolve placeholder 'LLM_API_KEY'" 并拒绝启动（fail-fast）。
+# ============================================================
+DB_PASSWORD: 你的MySQL密码
+LLM_API_KEY: sk-你的SiliconFlow密钥
+AMAP_KEY: 你的高德Web服务Key
+
+# 如需覆盖基础设施地址（默认值见 application.yml）：
+# DB_HOST: 127.0.0.1
+# DB_PORT: "3306"
+# REDIS_HOST: 127.0.0.1
+# MILVUS_URI: http://127.0.0.1:19530

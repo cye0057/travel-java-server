@@ -1,0 +1,48 @@
+
+# 密钥约定：本文件会进 Git，绝不写真实密钥。
+# 三类环境变量的取值来源：本地开发=application-dev.yml（已被 .gitignore 屏蔽）；
+# 服务器部署=docker compose 的 env_file(.env)；未配置时启动即报
+# "Could not resolve placeholder"——fail-fast，好过上线后调模型时才炸。
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}   # 本地默认dev（读application-dev.yml）；部署时用环境变量切成prod走纯环境变量注入
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/travel_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 3000   # 建连3秒失败即报错，MySQL没启动时别让请求干等
+  sql:
+    init:
+      mode: always   # 启动时执行 schema.sql（语句全部 IF NOT EXISTS，重复执行安全）
+  data:
+    redis:
+      host: ${REDIS_HOST:192.168.11.194}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 1s   # 建连超时：Redis没启动时1秒内失败
+      timeout: 2s           # 命令超时：默认60s会把接口拖成"假死"，降到2s配合代码里的异常兜底快速降级
+
+chat:
+  memory:
+    max-messages: 20    # 会话历史只保留最近20条，控制Token成本
+    ttl-seconds: 1800   # 30分钟无活动自动清除会话
+
+llm:
+    base-url: https://api.siliconflow.cn/v1
+    model: zai-org/GLM-4.5V
+    api-key: ${LLM_API_KEY}
+
+amap:
+  key: ${AMAP_KEY}    # 高德 Web服务 key（console.amap.com 申请）
+
+rag:
+  embedding-model: BAAI/bge-m3   # 1024维，已用真实请求核实；换模型必须重建collection（不同模型向量空间不通用）
+  top-k: 4                       # 每轮最多注入4条参考资料，控制提示词膨胀
+  min-score: 0.6                 # COSINE相似度阈值：实测 bge-m3 相关命中0.78+、无关问题0.49-0.56，取0.6一刀切开
+  embed-batch-size: 16
+  ingest-on-startup: true        # collection不存在时启动自动建库
+  milvus:
+    uri: ${MILVUS_URI:http://192.168.11.194:19530}
+    collection: travel_knowledge
+
