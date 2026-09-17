@@ -72,7 +72,22 @@ curl -s http://localhost:8080/api/user/register -H "Content-Type: application/js
 > compose 报 `invalid interpolation format for services.xxx.environment.XXX`，排查成本很高。
 > 上面第 4 步的 `config` 就是为此准备的，别省。
 
-浏览器访问：VM 内 `http://localhost`，局域网任意设备 `http://192.168.11.194`。
+浏览器访问：VM 内 `http://localhost`，局域网任意设备 `http://VM的IP`（本文档场景是 `192.168.11.194`）。
+
+## VM 换了网络环境（IP 变化）怎么办
+
+Redis/Milvus 地址已参数化为 `${REDIS_HOST}`，默认 `192.168.11.194`。VM 拿到新 IP 后：
+
+```bash
+cd travel-java-server/deploy
+echo "REDIS_HOST=新IP" >> .env          # 例：echo "REDIS_HOST=192.168.1.4" >> .env
+# 确认 .env 里已有这一行，再重建 backend（环境变量变了，必须 --force-recreate）
+docker compose -f docker-compose.lan.yml up -d --force-recreate backend
+docker compose -f docker-compose.lan.yml logs --tail=15 backend
+```
+
+浏览器访问地址也相应变成 `http://新IP`。注意之前注册过的用户名在新 IP 下仍算"已存在"，
+验活时用新用户名。
 
 ## 首次启动会发生什么（都是预期行为）
 

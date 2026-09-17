@@ -10,9 +10,9 @@
 # 变量写法只用最朴素的 ${VAR}，不要加冒号修饰：曾出现过被写坏成字面星号，
 # compose 报 "invalid interpolation format"，排查成本很高。所以上面那条 config 别省。
 #
-# 注意：backend 容器访问宿主机上的 Redis/Milvus 直连 VM 真实 IP 192.168.11.194。
-# 不要改成 host.docker.internal——host-gateway 解析到网桥 172.17.0.1，
-# 而这两个服务发布在 0.0.0.0 上，网桥地址无监听，表现为连接超时。
+# 注意：backend 容器访问宿主机上的 Redis/Milvus 直连 VM 真实 IP，用 ${REDIS_HOST} 控制
+# （默认 192.168.11.194，换网络环境后改成 VM 当前 IP）。不要写 host.docker.internal——
+# host-gateway 解析到网桥 172.17.0.1，而这两个服务发布在 0.0.0.0 上，网桥地址无监听，表现为连接超时。
 
 services:
 
@@ -43,11 +43,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       LLM_API_KEY: ${LLM_API_KEY}
       AMAP_KEY: ${AMAP_KEY}
-      # 复用宿主机 redis/milvus：直连 VM 真实 IP。
+      # 复用宿主机 redis/milvus：直连 VM 真实 IP，已参数化为 ${REDIS_HOST}。
+      # 换网络环境 VM 换 IP 时，在 .env 加 REDIS_HOST=新IP 即可，不用改本文件。
       # 不能写 host.docker.internal——host-gateway 解析到的是网桥 172.17.0.1，
       # 而这两个服务发布在 0.0.0.0 上，网桥地址没监听，表现为连接超时。
-      REDIS_HOST: 192.168.11.194
-      MILVUS_URI: http://192.168.11.194:19530
+      REDIS_HOST: ${REDIS_HOST:-192.168.11.194}
+      MILVUS_URI: http://${REDIS_HOST:-192.168.11.194}:19530
       TZ: Asia/Shanghai
     depends_on:
       mysql:
