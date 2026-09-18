@@ -9,7 +9,7 @@
 ## 0. 这个项目是什么（30 秒版）
 
 一个**不依赖 Spring AI / LangChain** 的 AI 应用后端：用 OkHttp 直连大模型 API，
-自己实现了完整链路——SSE 流式对话、Redis 多轮记忆、Function Calling 工具调用、
+自己实现了完整链路——SSE 分块推送、Redis 多轮记忆、Function Calling 工具调用、
 Milvus 向量 RAG、用户登录与历史回看。33 个 Java 类、约 2200 行。
 
 技术栈：Java 17 · Spring Boot 4.1 · MySQL 8 (JdbcTemplate) · Redis · Milvus 2.5 ·
@@ -66,7 +66,7 @@ SiliconFlow API         高德 Web API / Redis / Milvus / MySQL
 ### 第 1 步：读 `TravelController` + `ChatRequestDTO` —— 认识"软鉴权"
 先看入口长什么样。重点不是代码，是**设计决策**：
 
-- `POST /api/travel/chat` 返回 `SseEmitter`——Spring 的异步响应对象，这就是"打字机"效果的来源。
+- `POST /api/travel/chat` 返回 `SseEmitter`——Spring 的异步响应对象，这是分块推送最终答案的载体。注意它**不是**逐 token 透传：`runWithTools` 里 `chatStream` 的 `tokenCallback` 传 `null`，文本先缓冲，确认是最终答案后才按 80 字符分块推（原因见 `TravelServiceImpl` 第 332 行注释）。
 - `produces = "text/event-stream"`——告诉浏览器这是 SSE，不能当普通 JSON 解析。
 - 第 41-42 行：`resolveUserId` 返回 `null` 也能继续聊天。这是"软鉴权"——**登录用户 vs 游客的差别只在历史落不落库，功能都完整**。这种设计让产品转化路径极短：先体验、再注册。
 

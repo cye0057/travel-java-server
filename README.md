@@ -8,7 +8,7 @@
 | 模块 | 说明 | 技术要点 |
 |---|---|---|
 | 行程规划 | `POST /api/travel/recommend` 结构化 JSON 行程 | Prompt 工程 + Jackson 容错解析（剥 ```json 围栏） |
-| SSE 流式对话 | `POST /api/travel/chat` 打字机式回复 | 手写 SSE 协议解析（`data:`/`[DONE]`/think 标记剥离），有界线程池 + CallerRunsPolicy 背压 |
+| SSE 分块推送 | `POST /api/travel/chat` 分块推送最终答案 | 手写 SSE 协议解析（`data:`/`[DONE]`/控制标记剥离），有界线程池 + CallerRunsPolicy 背压；工具轮次先缓冲，避免中间态外泄 |
 | 多轮会话记忆 | Redis List 滑动窗口（LTRIM+EXPIRE） | 30 分钟空闲过期、20 条上限、空回答不落库防毒丸、孤儿消息头过滤 |
 | Function Calling | 3 个工具：城市预算/高德天气/高德POI | JSON-Schema 工具注册、流式 tool_calls 碎片按 index 累积、**并行调用串行化回传**（规避上游 tool→tool 校验缺陷）、工具名幻觉容错 |
 | RAG 知识库 | Milvus 向量检索注入系统提示词 | bge-m3 1024 维、按小节切块、Cache-Aside、相似度阈值校准（0.6）、needle 法验证检索有效性 |
@@ -47,7 +47,7 @@ mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS travel_db DEFAULT CHARSET utf8
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
 | POST | /api/travel/recommend | - | 生成结构化行程（JSON） |
-| POST | /api/travel/chat | 软鉴权 | SSE 流式对话；带 token 则对话进 7 天历史，游客不落库 |
+| POST | /api/travel/chat | 软鉴权 | SSE 分块推送；带 token 则对话进 7 天历史，游客不落库 |
 | GET/POST | /api/hot/questions, /api/hot/cities | - | 运营位数据 |
 | GET | /api/knowledge/search?q=&k= | - | RAG 召回调试（分数/出处） |
 | POST | /api/knowledge/reload | - | 重建向量库 |

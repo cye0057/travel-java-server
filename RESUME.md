@@ -9,9 +9,9 @@
 
 **AI 智能旅游助手 · 后端独立开发**　　Spring Boot / OkHttp / Redis / MySQL / Milvus
 
-不使用 Spring AI、LangChain 等 AI 框架，基于 OkHttp 直连大模型 API 手写完整 AI 应用后端链路，33 个类约 2200 行核心代码。实现 SSE 流式对话（打字机式回复）、Redis 滑动窗口多轮记忆、Function Calling 三工具调用、Milvus 向量 RAG 检索增强、用户体系（JWT 无状态免，改用 Redis 不透明 token 换取登出即时失效）、JMeter 压测定位瓶颈。
+不使用 Spring AI、LangChain 等 AI 框架，基于 OkHttp 直连大模型 API 手写完整 AI 应用后端链路，33 个类约 2200 行核心代码。实现 SSE 分块推送（工具轮次隔离，中间态不外泄）、Redis 滑动窗口多轮记忆、Function Calling 三工具调用、Milvus 向量 RAG 检索增强、用户体系（Redis 不透明 token 替代 JWT，换取登出即时失效 + 滑动过期）、JMeter 压测定位瓶颈。
 
-- **SSE 流式 + 有界线程池**：手写 SSE 协议解析（`data:`/`[DONE]`/思考标签剥离），线程池配 8 核 32 队列 + CallerRunsPolicy 背压，避免 LLM 长耗时请求拖垮 Tomcat 线程池
+- **SSE 分块推送 + 有界线程池**：手写 SSE 协议解析（`data:`/`[DONE]`/控制标记剥离），线程池配核心 8 / 最大 32 线程 + 100 有界队列 + CallerRunsPolicy 背压，避免 LLM 长耗时请求拖垮 Tomcat 线程池；工具调用轮次先缓冲、确认是最终答案才推送，中间态不外泄
 - **会话记忆**：Redis List 做 LTRIM 滑动窗口 + EXPIRE 30 分钟空闲过期，20 条上限控制 token 成本；空回答不落库防毒丸，过滤孤儿 assistant 消息头防上游 400
 - **Function Calling**：JSON-Schema 注册城市预算/高德天气/高德 POI 三工具，流式 `tool_calls` 按 index 累积重组；针对上游"拒绝连续 tool 消息"的缺陷，把 N 个并行调用拆成 N 对 assistant→tool 串行回传
 - **RAG 检索增强**：bge-m3 1024 维向量化，按 markdown 小节切块 + 城市前缀注入，Cosine 检索；用"针头测试"埋虚构事实验证召回有效性，按实测分数分布（相关 0.78+ / 无关 0.49~0.56）校准阈值 0.6
@@ -21,7 +21,7 @@
 
 ## 二、精简档（1~2 行）
 
-- **AI 旅游助手后端**：不依赖 Spring AI，OkHttp 直连模型 API 手写 SSE 流式对话 + Redis 滑动窗口记忆 + Function Calling + Milvus RAG 全链路；JMeter 压测 5 并发 0 错误，定位瓶颈在模型推理侧。
+- **AI 旅游助手后端**：不依赖 Spring AI，OkHttp 直连模型 API 手写 SSE 分块推送 + Redis 滑动窗口记忆 + Function Calling + Milvus RAG 全链路；JMeter 压测 5 并发 0 错误，定位瓶颈在模型推理侧。
 - **AI 应用后端**：手写大模型对话协议/上下文工程/检索增强/工具调用，含工具并行调用串行化、RAG 阈值实测校准、会话记忆毒丸防护等工程细节；2200 行核心代码，JMeter 三轮 0 错误。
 
 ---
@@ -61,6 +61,11 @@
 ### Q7：密钥和部署怎么处理？
 **A**：所有 yml 零真实密钥，业务密钥全部 `${ENV_VAR}` 占位符注入（本地 application-dev.yml 已被 gitignore，服务器走 docker `env_file`），另提交 `application-dev-example.yml` 模板。密钥缺失时启动期直接报 `Could not resolve placeholder` 崩溃。
 **R**：这是刻意的 fail-fast——好过带病上线、调模型时才炸。配合高德 key 配 IP 白名单，泄露也无法被盗用。
+
+### Q8：你的流式是真流式吗？用户多久看到第一个字？
+**A**：**上游是真流式读，下游是分块推送，不是逐 token 透传。** `chatStream` 的 `tokenCallback` 传 `null`，本轮文本先缓冲，等确认它是"最终答案"（而非工具中间轮的只言片语）后，再按 80 字符分块推给前端。
+**R**：这是个有意的权衡——代价是首字延迟等于完整生成时间（对话均值 ~7s），换来的是工具调用的中间态不会被用户看见（否则用户会先看到"我要调用天气工具"这类过程文本）。**如果要做真·低首字延迟**，需要按"是否含工具调用"分流：无工具的轮次直接透传 token，有工具的轮次才缓冲。已列为优化方向。
+**为什么这么答**：流式的本质价值是**首字延迟**，不是"分块传输"。主动说清这一点，比含糊带过更能体现对协议的理解。
 
 ---
 
