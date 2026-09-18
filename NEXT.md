@@ -15,7 +15,7 @@
 
 - **A 通信基建** ✅ LLMutils 改 record+Jackson（上游报错带响应正文）；SSE 有界线程池（8/32/队列100/CallerRunsPolicy）；Redis 会话记忆 List(RPUSH/LTRIM/EXPIRE)+TTL1800s+max-messages=20；空回答不写记忆；孤儿 assistant 过滤已修（ChatMemoryService.java:66-68）；前端 fetchStream 路径笔误/response.ok/sessionId 已修
 - **B Function Calling** ✅ 三工具：`get_city_info`(本地静态)、`get_weather`/`search_poi`(高德 AmapService，天气内部两次 HTTP 编排 district→weatherInfo)；见 §3 串行化决策
-- **C Milvus RAG** ✅ 语料 `resources/knowledge/*.md`（5 城×4 小节，内埋 3 处虚构针头事实用于验证）；EmbeddingService(bge-m3 1024维批量)；KnowledgeService(按 `##` 切块+城市前缀+<30字过滤；全量重建；collection `travel_knowledge` COSINE+AUTOINDEX)；chat 每轮现查现用注入 system 提示词；关键参数 `rag.top-k=4`、`rag.min-score=0.6`
+- **C Milvus RAG** ✅ 语料 `resources/knowledge/*.md`（5 城×4 小节，每城"隐藏福利"小节各埋 1 处虚构针头事实，共 5 处，用于验证检索链路）；EmbeddingService(bge-m3 1024维批量)；KnowledgeService(按 `##` 切块+城市前缀+<30字过滤；全量重建；collection `travel_knowledge` COSINE+AUTOINDEX)；chat 每轮现查现用注入 system 提示词；关键参数 `rag.top-k=4`、`rag.min-score=0.6`
 - **D 部署上线 + GitHub + JMeter** ✅ **已完成**（2026-09-17 核对）。实际执行与 §2 原计划有偏差，均为更优做法：未建 `application-example.yml`，改为把 `application.yml` 全量环境变量化（`${ENV_VAR}` 占位符，入库零真实密钥）+ 新增 `application-dev-example.yml` 模板 + `.gitignore` 屏蔽 `application-dev.yml`；git 历史经 `-S` 全量扫描确认从未出现真实密钥；仓库 `cye0057/travel-java-server`（main 分支，非 master）已推送且本地=远端 `2a4980b`；JMeter 报告已提交 `docs/benchmark.md`；8080/8081 无残留进程
 - **E 简历项目描述** ✅ **已完成**（2026-09-17）。产出 `RESUME.md`：完整档 350 字简历正文 / 精简档 1~2 行 / STAR 面试版 7 个高频问题 / 已知边界 / 技术栈关键词
 - **VM 局域网部署实战** ✅ **已跑通**（2026-09-17，192.168.11.194）。过程中排掉 3 个坑，均已固化进 `deploy/DEPLOY.md` 与 compose：
@@ -51,7 +51,7 @@
 SiliconFlow/GLM 的校验器**拒绝连续的 tool 消息**（裸 API 实验复现：400 code 20015 "after tool message, next must be user or assistant"）。模型一轮并行发起 2 个调用本身没问题，但按 OpenAI 惯例连着回传 2 条 tool 就被拒。修法：拆成 `assistant(只带这一个call) → tool(对应结果)` 重复 N 次，实测上游接受且模型能综合多结果作答（`runWithTools`）。为什么不加 `parallel_tool_calls:false`？——实测上游只"接受"该字段，未必真约束模型行为；串行化是无论模型怎么发都成立的兜底。
 
 **③ RAG 阈值 min-score 为什么定 0.6**
-向量检索永远会返回"最近的 K 条"，哪怕库里毫无相关内容。实测 bge-m3 分数分两群：相关命中 0.78+，无关问题 0.49~0.56（库外问题曾以 0.55 误召回 4 条无关资料）。取两群中间的 0.6 一刀切开后：库外题召回 0 条（模型如实说"暂不支持"），针头题召回 3 条且答案全对。教训：相似度阈值不能抄博客，必须用自家 embedding 模型实测分数分布来定。
+向量检索永远会返回"最近的 K 条"，哪怕库里毫无相关内容。实测 bge-m3 分数分两群：相关命中 0.78+，无关问题 0.49~0.56（库外问题曾以 0.55 误召回 4 条无关资料）。取两群中间的 0.6 一刀切开后：库外题召回 0 条（模型如实说"暂不支持"），5 处针头事实对应的提问全部答对。教训：相似度阈值不能抄博客，必须用自家 embedding 模型实测分数分布来定。
 
 **④ 其他**
 - RAG 资料**不进 Redis 记忆**：记忆跨轮复用，进了等于每轮回放旧资料，token 膨胀且把过期资料喂给新问题。
